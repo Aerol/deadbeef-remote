@@ -42,6 +42,7 @@ static DB_functions_t *deadbeef;
 static intptr_t loop_tid; // wtf is tid?
 static int need_reset = 0;
 int s; // Socket
+int finished; // kill loop when we're done.
 
 /*
   Listen for UDP packets for actions to perform.
@@ -49,7 +50,7 @@ int s; // Socket
  */
 
 static void
-remote_event_loop (void *blank) {
+remote_listen (void) {
     // start listening for udp packets.
     struct addrinfo hints, *results;
     struct sockaddr_storage peer_addr;
@@ -58,7 +59,7 @@ remote_event_loop (void *blank) {
     char buf[BUF_SIZE];
     int status;
 
-    memset(&hints, 0, sizeof hints);
+    memset(&hints, 0, sizeof hints); // Makes sure the struct is empty, thanks beej.
 
     hints.ai_family = AF_UNSPEC; // Use IPv4 or IPv6.
     hints.ai_socktype = SOCK_DGRAM; // Using UDP
@@ -70,7 +71,7 @@ remote_event_loop (void *blank) {
 
     // possible error point. :/
     if ((status = getaddrinfo(NULL, "4141", &hints, &results)) != 0) {
-	trace (stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+	fprintf (stderr, "getaddrinfo error: %s\n", gai_strerror(status));
     }
 
     // Do stuff
@@ -84,36 +85,28 @@ remote_event_loop (void *blank) {
     // Done with results
     freeaddrinfo (results);
 
-    // Start main loop
-    for (;;) {
-	peer_addr_len = sizeof (struct sockaddr_storage);
-	nread = recvfrom(s, buf, BUF_SIZE, 0,
-			 (struct sockaddr *) &peer_addr, &peer_addr_len);
-	if (nread == -1) {
-	    continue; // Ignore failed request
-	}
-
-	char host[NI_MAXHOST], service[NI_MAXSERV];
-
-    }
+    // Call main recv loop here or from plugin_start?
 }
 
 static int
 plugin_start (void) {
+    finished = 0;
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
     // Dunno of what else to do. :/
-    loop_tid = deadbeef->thread_start (remote_event_loop, 0);
+    remote_listen();
+    //
     return 0;
 }
 
-static void
+static int
 plugin_stop (void) {
     // Stop listener and cleanup.
     if(loop_tid) {
-	close (s);
-	deadbeef->thread_join (loop_tid);
+	finished = 1;
+	close(s);
     }
+    return 0;
 }
 
 int
@@ -308,8 +301,8 @@ hotkeys_get_actions (DB_playItem_t *it)
 static DB_remote_plugin_t plugin = {
     .misc.plugin.api_vmajor = 1,
     .misc.plugin.api_vminor = 0,
-    .misc.plugin.version_major = 1,
-    .misc.plugin.version_minor = 0,
+    .misc.plugin.version_major = 0,
+    .misc.plugin.version_minor = 1,
     .misc.plugin.type = DB_PLUGIN_MISC,
     .misc.plugin.id = "remote",
     .misc.plugin.name = "Remote control",
@@ -337,7 +330,7 @@ static DB_remote_plugin_t plugin = {
         "ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY\n"
         "OF SUCH DAMAGE.\n"
     ,
-    .misc.plugin.url = "https://github.com/Aerol/deadbeef-remote"
+    .misc.plugin.website = "https://github.com/Aerol/deadbeef-remote",
     .misc.plugin.start = plugin_start,
     .misc.plugin.stop = plugin_stop,
 };
