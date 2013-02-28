@@ -39,8 +39,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 static DB_remote_plugin_t plugin;
 static DB_functions_t *deadbeef;
-static intptr_t loop_tid; // wtf is tid?
-static int need_reset = 0;
+static intptr_t remote_tid; // thread id?
+static int remote_stopthread;
 int s; // Socket
 int finished; // kill loop when we're done.
 
@@ -84,17 +84,23 @@ remote_listen (void) {
 
     // Done with results
     freeaddrinfo (results);
+}
 
-    // Call main recv loop here or from plugin_start?
+static void
+remote_thread (void *ha) {
+    trace ("remote thread started\n");
+    // recvfrom and process messages.
 }
 
 static int
 plugin_start (void) {
-    finished = 0;
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
-    // Dunno of what else to do. :/
-    remote_listen();
+    finished = 0;
+    if(deadbeef->conf_get_int ("remote.enable", 0)) {
+	remote_listen();
+	remote_tid = deadbeef->thread_start (remote_thread, NULL);
+    }
     //
     return 0;
 }
@@ -102,8 +108,10 @@ plugin_start (void) {
 static int
 plugin_stop (void) {
     // Stop listener and cleanup.
-    if(loop_tid) {
+    if(remote_tid) {
 	finished = 1;
+	trace ("waiting for thread to finish\n");
+	deadbeef->thread_join (remote_tid);
 	close(s);
     }
     return 0;
@@ -296,6 +304,9 @@ hotkeys_get_actions (DB_playItem_t *it)
 }
 */
 
+static const char settings_dlg[] =
+    "property \"Enable remote\" checkbox remote.enable 0;";
+
 
 // define plugin interface
 static DB_remote_plugin_t plugin = {
@@ -333,6 +344,7 @@ static DB_remote_plugin_t plugin = {
     .misc.plugin.website = "https://github.com/Aerol/deadbeef-remote",
     .misc.plugin.start = plugin_start,
     .misc.plugin.stop = plugin_stop,
+    .misc.plugin.configdialog = settings_dlg,
 };
 
 DB_plugin_t *
