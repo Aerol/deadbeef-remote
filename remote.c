@@ -25,8 +25,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <sys/types.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 
@@ -34,27 +35,85 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <deadbeef/deadbeef.h>
 
 #define trace(fmt,...)
+#define BUF_SIZE 500
 
 static DB_remote_plugin_t plugin;
 static DB_functions_t *deadbeef;
-static int finished;
-static intptr_t loop_tid;
+static intptr_t loop_tid; // wtf is tid?
 static int need_reset = 0;
+int s; // Socket
 
 /*
   Listen for UDP packets for actions to perform.
   Next track, prev track, play/pause, stop, etc.
  */
 
-static int plugin_start(void) {
+static void
+remote_event_loop (void *blank) {
+    // start listening for udp packets.
+    struct addrinfo hints, *results;
+    struct sockaddr_storage peer_addr;
+    socklen_t peer_addr_len;
+    ssize_t nread;
+    char buf[BUF_SIZE];
+    int status;
+
+    memset(&hints, 0, sizeof hints);
+
+    hints.ai_family = AF_UNSPEC; // Use IPv4 or IPv6.
+    hints.ai_socktype = SOCK_DGRAM; // Using UDP
+    hints.ai_flags = AI_PASSIVE; // Don't need to know our local IP. Thanks Unix!
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+
+    // possible error point. :/
+    if ((status = getaddrinfo(NULL, "4141", &hints, &results)) != 0) {
+	trace (stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+    }
+
+    // Do stuff
+    if ((s = socket (results->ai_family, results->ai_socktype, results->ai_protocol)) != 0) {
+	trace ("couldn't create socket'");
+    }
+    if ((bind(s, results->ai_addr, results->ai_addrlen)) != 0) {
+	trace ("couldn't bind'");
+    }
+
+    // Done with results
+    freeaddrinfo (results);
+
+    // Start main loop
+    for (;;) {
+	peer_addr_len = sizeof (struct sockaddr_storage);
+	nread = recvfrom(s, buf, BUF_SIZE, 0,
+			 (struct sockaddr *) &peer_addr, &peer_addr_len);
+	if (nread == -1) {
+	    continue; // Ignore failed request
+	}
+
+	char host[NI_MAXHOST], service[NI_MAXSERV];
+
+    }
+}
+
+static int
+plugin_start (void) {
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
     // Dunno of what else to do. :/
+    loop_tid = deadbeef->thread_start (remote_event_loop, 0);
     return 0;
 }
 
-static void plugin_stop(void) {
+static void
+plugin_stop (void) {
     // Stop listener and cleanup.
+    if(loop_tid) {
+	close (s);
+	deadbeef->thread_join (loop_tid);
+    }
 }
 
 int
@@ -138,6 +197,9 @@ action_toggle_stop_after_current_cb (struct DB_plugin_action_s *action, DB_playI
     return 0;
 }
 
+
+// Are these needed?
+/*
 static DB_plugin_action_t action_play = {
     .title = "Play",
     .name = "play",
@@ -239,6 +301,8 @@ hotkeys_get_actions (DB_playItem_t *it)
 {
     return &action_toggle_stop_after_current;
 }
+*/
+
 
 // define plugin interface
 static DB_remote_plugin_t plugin = {
@@ -255,7 +319,7 @@ static DB_remote_plugin_t plugin = {
         "Copyright (C) 2013 Henry Case <rectifier04@gmail.com>\n"
         "\n"
         "Redistribution and use in source and binary forms, with or without modification, are permitted\n"
-        "provided that the following conditions are met:"
+        "provided that the following conditions are met:\n"
         "\t1. Redistributions of source code must retain the above copyright notice, this list of \n"
         "\tconditions and the following disclaimer.\n"
         "\t2. Redistributions in binary form must reproduce the above copyright notice, this list of \n"
@@ -273,6 +337,7 @@ static DB_remote_plugin_t plugin = {
         "ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY\n"
         "OF SUCH DAMAGE.\n"
     ,
+    .misc.plugin.url = "https://github.com/Aerol/deadbeef-remote"
     .misc.plugin.start = plugin_start,
     .misc.plugin.stop = plugin_stop,
 };
