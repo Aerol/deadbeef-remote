@@ -39,10 +39,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 static DB_remote_plugin_t plugin;
 static DB_functions_t *deadbeef;
+static uintptr_t remote_mutex;
 static intptr_t remote_tid; // thread id?
 static int remote_stopthread;
-int s; // Socket
-int finished; // kill loop when we're done.
+int s; // Socket fd
 
 /*
   Listen for UDP packets for actions to perform.
@@ -53,10 +53,6 @@ static void
 remote_listen (void) {
     // start listening for udp packets.
     struct addrinfo hints, *results;
-    struct sockaddr_storage peer_addr;
-    socklen_t peer_addr_len;
-    ssize_t nread;
-    char buf[BUF_SIZE];
     int status;
 
     memset(&hints, 0, sizeof hints); // Makes sure the struct is empty, thanks beej.
@@ -88,16 +84,34 @@ remote_listen (void) {
 
 static void
 remote_thread (void *ha) {
+    struct sockaddr_storage peer_addr;
+    socklen_t peer_addr_len;
+    ssize_t nread;
+    char buf[BUF_SIZE];
+
     trace ("remote thread started\n");
     // recvfrom and process messages.
+    /* for (;;) { */
+    /* 	if (remote_stopthread) { */
+    /* 	    return; */
+    /* 	} */
+    /* 	peer_addr_len = sizeof (struct sockaddr_storage); */
+    /* 	nread = recvfrom (s, buf, BUF_SIZE, 0, */
+    /* 			  (struct sockaddr *) &peer_addr, &peer_addr_len); */
+    /* 	if (nread == -1) { */
+    /* 	    continue; */
+    /* 	} */
+
+    /* 	// Do stuff with buf? */
+    /* } */
 }
 
 static int
 plugin_start (void) {
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
-    finished = 0;
     if(deadbeef->conf_get_int ("remote.enable", 0)) {
+
 	remote_listen();
 	remote_tid = deadbeef->thread_start (remote_thread, NULL);
     }
@@ -109,7 +123,7 @@ static int
 plugin_stop (void) {
     // Stop listener and cleanup.
     if(remote_tid) {
-	finished = 1;
+	remote_stopthread = 1;
 	trace ("waiting for thread to finish\n");
 	deadbeef->thread_join (remote_tid);
 	close(s);
