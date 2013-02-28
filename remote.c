@@ -89,12 +89,15 @@ remote_thread (void *ha) {
     ssize_t nread;
     char buf[BUF_SIZE];
 
-    trace ("remote thread started\n");
     // recvfrom and process messages.
+    // keeps plugin from being unloaded when this is executing :/
     /* for (;;) { */
-    /* 	if (remote_stopthread) { */
+    /* 	if (remote_stopthread == 1) { */
+    /* 	    deadbeef->mutex_unlock (remote_mutex); */
+    /* 	    printf("stopping thread"); */
     /* 	    return; */
     /* 	} */
+    /* 	printf("Waiting for messages"); */
     /* 	peer_addr_len = sizeof (struct sockaddr_storage); */
     /* 	nread = recvfrom (s, buf, BUF_SIZE, 0, */
     /* 			  (struct sockaddr *) &peer_addr, &peer_addr_len); */
@@ -104,6 +107,8 @@ remote_thread (void *ha) {
 
     /* 	// Do stuff with buf? */
     /* } */
+
+    return;
 }
 
 static int
@@ -111,7 +116,8 @@ plugin_start (void) {
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
     if(deadbeef->conf_get_int ("remote.enable", 0)) {
-
+	remote_stopthread = 0;
+	remote_mutex = deadbeef->mutex_create_nonrecursive ();
 	remote_listen();
 	remote_tid = deadbeef->thread_start (remote_thread, NULL);
     }
@@ -126,6 +132,7 @@ plugin_stop (void) {
 	remote_stopthread = 1;
 	trace ("waiting for thread to finish\n");
 	deadbeef->thread_join (remote_tid);
+	deadbeef->mutex_free (remote_mutex);
 	close(s);
     }
     return 0;
