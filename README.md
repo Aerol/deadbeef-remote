@@ -8,6 +8,6 @@ Remote control plugin for DeadBeeF
      mv remote.so ~/.local/lib/deadbeef/
 
 ## TODO
-1. Get thread loop working properly. :/
+1. Finish message processing
 2. ???
 3. Profit!
