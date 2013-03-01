@@ -27,7 +27,7 @@ main(int argc, char *argv[])
     hints.ai_flags = 0;
     hints.ai_protocol = 0;          /* Any protocol */
 
-    s = getaddrinfo("192.168.1.", "4141", &hints, &result);
+    s = getaddrinfo("192.168.1.1", "4141", &hints, &result);
     if (s != 0) {
 	fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 	exit(EXIT_FAILURE);

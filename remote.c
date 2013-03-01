@@ -128,7 +128,7 @@ remote_thread (void *ha) {
     	    return;
     	}
     	peer_addr_len = sizeof (struct sockaddr_storage);
-	int f = poll (ufds, 1, 2000);
+	int f = poll (ufds, 1, 1000);
 	if (f == -1) {
 	    printf ("error occurred in poll()");
 	} else if (f == 0) {
