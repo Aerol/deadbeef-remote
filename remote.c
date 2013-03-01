@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 static DB_remote_plugin_t plugin;
 static DB_functions_t *deadbeef;
 static uintptr_t remote_mutex;
+static uintptr_t remote_cond;
 static intptr_t remote_tid; // thread id?
 static int remote_stopthread;
 int sfd; // Socket fd
@@ -52,7 +53,7 @@ int sfd; // Socket fd
 
 static void
 perform_action (char buf) {
-    printf ("char %d", buf);
+    printf ("char %c\n", buf);
     switch (buf) {
     case '1':
 	action_play_cb (NULL, NULL);
@@ -124,10 +125,11 @@ remote_thread (void *ha) {
 
     	if (remote_stopthread == 1) {
     	    deadbeef->mutex_unlock (remote_mutex);
-    	    printf("stopping thread");
     	    return;
     	}
+
     	peer_addr_len = sizeof (struct sockaddr_storage);
+
 	int f = poll (ufds, 1, 1000);
 	if (f == -1) {
 	    printf ("error occurred in poll()");
@@ -143,7 +145,6 @@ remote_thread (void *ha) {
 
     	// Do stuff with buf?
 	if (buf[0] != 0) {
-	    printf("buf: %x\n", buf[0]);
 	    perform_action (buf[0]);
 	    // We've read buf, we can clear it now.
 	    buf[0] = 0;
@@ -157,12 +158,11 @@ static int
 plugin_start (void) {
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
-    if (deadbeef->conf_get_int ("remote.enable", 0)) {
-	remote_stopthread = 0;
-	remote_mutex = deadbeef->mutex_create_nonrecursive ();
-	remote_listen ();
-	remote_tid = deadbeef->thread_start (remote_thread, NULL);
-    }
+    remote_stopthread = 0;
+    remote_mutex = deadbeef->mutex_create_nonrecursive ();
+    //remote_cond = deadbeef->cond_create ();
+    remote_listen ();
+    remote_tid = deadbeef->thread_start (remote_thread, NULL);
     //
     return 0;
 }
@@ -262,7 +262,7 @@ action_toggle_stop_after_current_cb (struct DB_plugin_action_s *action, DB_playI
 }
 
 static const char settings_dlg[] =
-    "property \"Enable remote\" checkbox remote.enable 0;"
+    "property \"Enable remote - This don't do nothin' right now\" checkbox remote.enable 0;"
     "property \"Listen IP\" entry remote.listen \"\";\n"
     "property \"Port\" entry remote.port \"\";\n"
 ;
