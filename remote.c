@@ -66,12 +66,12 @@ remote_listen (void) {
     hints.ai_next = NULL;
 
     // possible error point. :/
-    if ((status = getaddrinfo(NULL, "4141", &hints, &results)) != 0) {
+    if ((status = getaddrinfo("127.0.0.1", "4141", &hints, &results)) != 0) {
 	fprintf (stderr, "getaddrinfo error: %s\n", gai_strerror(status));
     }
 
     // Do stuff
-    if ((s = socket (results->ai_family, results->ai_socktype, results->ai_protocol)) != 0) {
+    if ((s = socket (results->ai_family, results->ai_socktype|SOCK_NONBLOCK, results->ai_protocol)) != 0) {
 	trace ("couldn't create socket'");
     }
     if ((bind(s, results->ai_addr, results->ai_addrlen)) != 0) {
@@ -90,23 +90,27 @@ remote_thread (void *ha) {
     char buf[BUF_SIZE];
 
     // recvfrom and process messages.
-    // keeps plugin from being unloaded when this is executing :/
-    /* for (;;) { */
-    /* 	if (remote_stopthread == 1) { */
-    /* 	    deadbeef->mutex_unlock (remote_mutex); */
-    /* 	    printf("stopping thread"); */
-    /* 	    return; */
-    /* 	} */
-    /* 	printf("Waiting for messages"); */
-    /* 	peer_addr_len = sizeof (struct sockaddr_storage); */
-    /* 	nread = recvfrom (s, buf, BUF_SIZE, 0, */
-    /* 			  (struct sockaddr *) &peer_addr, &peer_addr_len); */
-    /* 	if (nread == -1) { */
-    /* 	    continue; */
-    /* 	} */
+    for (;;) {
+    	if (remote_stopthread == 1) {
+    	    deadbeef->mutex_unlock (remote_mutex);
+    	    printf("stopping thread");
+    	    return;
+    	}
+    	peer_addr_len = sizeof (struct sockaddr_storage);
+    	nread = recvfrom (s, buf, BUF_SIZE, 0,
+    			  (struct sockaddr *) &peer_addr, &peer_addr_len);
 
-    /* 	// Do stuff with buf? */
-    /* } */
+    	if (nread == -1) {
+    	    continue;
+    	}
+
+    	// Do stuff with buf?
+	if (buf[0] != 0) {
+	    printf("buf: %x\n", buf[0]);
+	    // We've read buf, we can clear it now.
+	    buf[0] = 0;
+	}
+    }
 
     return;
 }
