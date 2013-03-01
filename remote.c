@@ -42,7 +42,7 @@ static DB_functions_t *deadbeef;
 static uintptr_t remote_mutex;
 static intptr_t remote_tid; // thread id?
 static int remote_stopthread;
-int s; // Socket fd
+int sfd; // Socket fd
 
 /*
   Listen for UDP packets for actions to perform.
@@ -65,16 +65,17 @@ remote_listen (void) {
     hints.ai_addr = NULL;
     hints.ai_next = NULL;
 
-    // possible error point. :/
-    if ((status = getaddrinfo("127.0.0.1", "4141", &hints, &results)) != 0) {
+    deadbeef->conf_lock();
+    if ((status = getaddrinfo(deadbeef->conf_get_str_fast ("remote.listen",""),
+			      deadbeef->conf_get_str_fast ("remote.port",""), &hints, &results)) != 0) {
 	fprintf (stderr, "getaddrinfo error: %s\n", gai_strerror(status));
     }
-
+    deadbeef->conf_unlock();
     // Do stuff
-    if ((s = socket (results->ai_family, results->ai_socktype|SOCK_NONBLOCK, results->ai_protocol)) != 0) {
+    if ((sfd = socket (results->ai_family, results->ai_socktype|SOCK_NONBLOCK, results->ai_protocol)) != 0) {
 	trace ("couldn't create socket'");
     }
-    if ((bind(s, results->ai_addr, results->ai_addrlen)) != 0) {
+    if ((bind(sfd, results->ai_addr, results->ai_addrlen)) != 0) {
 	trace ("couldn't bind'");
     }
 
@@ -91,13 +92,14 @@ remote_thread (void *ha) {
 
     // recvfrom and process messages.
     for (;;) {
+
     	if (remote_stopthread == 1) {
     	    deadbeef->mutex_unlock (remote_mutex);
     	    printf("stopping thread");
     	    return;
     	}
     	peer_addr_len = sizeof (struct sockaddr_storage);
-    	nread = recvfrom (s, buf, BUF_SIZE, 0,
+    	nread = recvfrom (sfd, buf, BUF_SIZE, 0,
     			  (struct sockaddr *) &peer_addr, &peer_addr_len);
 
     	if (nread == -1) {
@@ -119,10 +121,10 @@ static int
 plugin_start (void) {
     // Start plugin (duh)
     // Setup UDP listener to do stuff when receiving special datagrams
-    if(deadbeef->conf_get_int ("remote.enable", 0)) {
+    if (deadbeef->conf_get_int ("remote.enable", 0)) {
 	remote_stopthread = 0;
 	remote_mutex = deadbeef->mutex_create_nonrecursive ();
-	remote_listen();
+	remote_listen ();
 	remote_tid = deadbeef->thread_start (remote_thread, NULL);
     }
     //
@@ -132,12 +134,12 @@ plugin_start (void) {
 static int
 plugin_stop (void) {
     // Stop listener and cleanup.
-    if(remote_tid) {
+    if (remote_tid) {
 	remote_stopthread = 1;
 	trace ("waiting for thread to finish\n");
 	deadbeef->thread_join (remote_tid);
 	deadbeef->mutex_free (remote_mutex);
-	close(s);
+	close (sfd);
     }
     return 0;
 }
@@ -330,7 +332,10 @@ hotkeys_get_actions (DB_playItem_t *it)
 */
 
 static const char settings_dlg[] =
-    "property \"Enable remote\" checkbox remote.enable 0;";
+    "property \"Enable remote\" checkbox remote.enable 0;"
+    "property \"Listen IP\" entry remote.listen \"\";\n"
+    "property \"Port\" entry remote.port \"\";\n"
+;
 
 
 // define plugin interface
