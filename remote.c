@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <sys/poll.h>
 
 #include "remote.h"
 #include <deadbeef/deadbeef.h>
@@ -96,7 +97,7 @@ remote_listen (void) {
     }
     deadbeef->conf_unlock();
     // Do stuff
-    if ((sfd = socket (results->ai_family, results->ai_socktype|SOCK_NONBLOCK, results->ai_protocol)) != 0) {
+    if ((sfd = socket (results->ai_family, results->ai_socktype, results->ai_protocol)) != 0) {
 	trace ("couldn't create socket'");
     }
     if ((bind(sfd, results->ai_addr, results->ai_addrlen)) != 0) {
@@ -109,10 +110,14 @@ remote_listen (void) {
 
 static void
 remote_thread (void *ha) {
+    struct pollfd ufds[1];
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
     ssize_t nread;
     char buf[BUF_SIZE];
+
+    ufds[0].fd = sfd;
+    ufds[0].events = POLLIN;
 
     // recvfrom and process messages.
     for (;;) {
@@ -123,8 +128,14 @@ remote_thread (void *ha) {
     	    return;
     	}
     	peer_addr_len = sizeof (struct sockaddr_storage);
-    	nread = recvfrom (sfd, buf, BUF_SIZE, 0,
-    			  (struct sockaddr *) &peer_addr, &peer_addr_len);
+	int f = poll (ufds, 1, 2000);
+	if (f == -1) {
+	    printf ("error occurred in poll()");
+	} else if (f == 0) {
+	    continue;
+	} else {
+	    nread = recvfrom (sfd, buf, BUF_SIZE, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+	}
 
     	if (nread == -1) {
     	    continue;
