@@ -50,6 +50,30 @@ int sfd; // Socket fd
  */
 
 static void
+perform_action (char buf) {
+    printf ("char %d", buf);
+    switch (buf) {
+    case '1':
+	action_play_cb (NULL, NULL);
+	break;
+    case '2':
+	action_prev_cb (NULL, NULL);
+	break;
+    case '3':
+	action_next_cb (NULL, NULL);
+	break;
+    case '4':
+	action_stop_cb (NULL, NULL);
+	break;
+    case '5':
+	action_toggle_pause_cb (NULL, NULL);
+	break;
+    default:
+	break;
+    }
+}
+
+static void
 remote_listen (void) {
     // start listening for udp packets.
     struct addrinfo hints, *results;
@@ -109,6 +133,7 @@ remote_thread (void *ha) {
     	// Do stuff with buf?
 	if (buf[0] != 0) {
 	    printf("buf: %x\n", buf[0]);
+	    perform_action (buf[0]);
 	    // We've read buf, we can clear it now.
 	    buf[0] = 0;
 	}
