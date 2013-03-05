@@ -70,6 +70,12 @@ perform_action (char buf) {
     case '5':
 	action_toggle_pause_cb (NULL, NULL);
 	break;
+    case '6':
+	action_play_random_cb (NULL, NULL);
+	break;
+    case '7':
+	action_toggle_stop_after_current_cb (NULL, NULL);
+	break;
     default:
 	break;
     }
