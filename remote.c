@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <deadbeef/deadbeef.h>
 
 #define trace(fmt,...)
-#define BUF_SIZE 500
+#define BUF_SIZE 5
 
 static DB_remote_plugin_t plugin;
 static DB_functions_t *deadbeef;
@@ -53,7 +53,7 @@ int sfd; // Socket fd
 
 static void
 perform_action (char buf) {
-    printf ("char %c\n", buf);
+
     switch (buf) {
     case '1':
 	action_play_cb (NULL, NULL);
@@ -73,6 +73,7 @@ perform_action (char buf) {
     default:
 	break;
     }
+    return;
 }
 
 static void
@@ -87,9 +88,6 @@ remote_listen (void) {
     hints.ai_socktype = SOCK_DGRAM; // Using UDP
     hints.ai_flags = AI_PASSIVE; // Don't need to know our local IP. Thanks Unix!
     hints.ai_protocol = 0;
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
 
     deadbeef->conf_lock();
     if ((status = getaddrinfo(deadbeef->conf_get_str_fast ("remote.listen",""),
