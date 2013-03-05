@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define BUF_SIZE 500
+#define BUF_SIZE 5
 
 int
 main(int argc, char *argv[])
@@ -18,6 +18,11 @@ main(int argc, char *argv[])
     ssize_t nread;
     char buf[BUF_SIZE];
 
+    if (argc < 4) {
+	printf ("Usage: ./client ip port command\n");
+	return 1;
+    }
+
 
 /* Obtain address(es) matching host/port */
 
@@ -27,7 +32,7 @@ main(int argc, char *argv[])
     hints.ai_flags = 0;
     hints.ai_protocol = 0;          /* Any protocol */
 
-    s = getaddrinfo("192.168.1.1", "4141", &hints, &result);
+    s = getaddrinfo(argv[1], argv[2], &hints, &result);
     if (s != 0) {
 	fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 	exit(EXIT_FAILURE);
@@ -59,7 +64,7 @@ main(int argc, char *argv[])
  /* Send remaining command-line arguments as separate
     datagrams, and read responses from server */
 
-    for (j = 1; j < argc; j++) {
+    for (j = 3; j < argc; j++) {
 	len = strlen(argv[j]) + 1;
      /* +1 for terminating null byte */
 	/* if (len + 1 > BUF_SIZE) { */
